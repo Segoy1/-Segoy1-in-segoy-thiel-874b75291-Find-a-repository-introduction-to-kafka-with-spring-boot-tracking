@@ -1,5 +1,6 @@
-package dev.lydtech.tracking.message;
+package dev.lydtech.dispatch.message;
 
+import dev.lydtech.tracking.message.Status;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
