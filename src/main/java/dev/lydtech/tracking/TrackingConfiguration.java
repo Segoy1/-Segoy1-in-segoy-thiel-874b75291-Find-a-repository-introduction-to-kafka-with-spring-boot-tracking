@@ -23,6 +23,8 @@ import java.util.Map;
 public class TrackingConfiguration {
 
 
+    public static final String DEV_LYDTECH_DISPATCH_MESSAGE = "dev.lydtech.dispatch.message";
+
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(ConsumerFactory<String, Object> consumerFactory){
         ConcurrentKafkaListenerContainerFactory<String, Object> factory =
@@ -37,9 +39,8 @@ public class TrackingConfiguration {
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
         config.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, JsonDeserializer.class);
-        config.put(JsonDeserializer.VALUE_DEFAULT_TYPE, DispatchPreparing.class.getCanonicalName());
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        config.put(JsonDeserializer.TRUSTED_PACKAGES, "dev.lydtech.dispatch.message");
+        config.put(JsonDeserializer.TRUSTED_PACKAGES, DEV_LYDTECH_DISPATCH_MESSAGE);
         return new DefaultKafkaConsumerFactory<>(config);
 
     }
