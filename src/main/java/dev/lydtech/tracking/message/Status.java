@@ -1,5 +1,6 @@
 package dev.lydtech.tracking.message;
 
 public enum Status {
-    PREPARING;
+    PREPARING,
+    COMPLETED;
 }

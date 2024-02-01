@@ -1,5 +1,6 @@
 package dev.lydtech.tracking.integration;
 
+import dev.lydtech.dispatch.message.DispatchCompleted;
 import dev.lydtech.dispatch.message.DispatchPreparing;
 import dev.lydtech.tracking.TrackingConfiguration;
 import dev.lydtech.dispatch.message.TrackingStatusUpdated;
@@ -10,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.annotation.KafkaHandler;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -22,6 +24,7 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -64,14 +67,22 @@ public class DispatchTrackingIntegrationTest {
     /**
      * Use this receiver to consume messages from the outbound topics.
      */
+    @KafkaListener(groupId = "KafkaIntegrationTest", topics = DISPATCH_TRACKING_TOPIC)
     public static class KafkaTestListener {
         AtomicInteger dispatchPreparingCounter = new AtomicInteger(0);
+        AtomicInteger dispatchCompletedCounter = new AtomicInteger(0);
         AtomicInteger trackingStatusCounter = new AtomicInteger(0);
 
-        @KafkaListener(groupId = "KafkaIntegrationTest", topics = DISPATCH_TRACKING_TOPIC)
+        @KafkaHandler
         void receiveDispatchPreparing(@Payload DispatchPreparing payload) {
             log.debug("Received DispatchPreparing: " + payload);
             dispatchPreparingCounter.incrementAndGet();
+        }
+
+        @KafkaHandler
+        void receiveDispatchCompleted(@Payload DispatchCompleted payload) {
+            log.debug("Received DispatchComleted: " + payload);
+            dispatchCompletedCounter.incrementAndGet();
         }
 
         @KafkaListener(groupId = "KafkaIntegrationTest", topics = TRACKING_STATUS_TOPIC)
@@ -84,14 +95,16 @@ public class DispatchTrackingIntegrationTest {
     @BeforeEach
     public void setUp() {
         testListener.dispatchPreparingCounter.set(0);
+        testListener.dispatchCompletedCounter.set(0);
         testListener.trackingStatusCounter.set(0);
 
         // Wait until the partitions are assigned.
         registry.getListenerContainers().stream().forEach(container ->
                 ContainerTestUtils.waitForAssignment(container, embeddedKafkaBroker.getPartitionsPerTopic()));
     }
+
     @Test
-    public void testDispatchTrackingFlow() throws Exception {
+    public void testDispatchPreparingTrackingFlow() throws Exception {
         DispatchPreparing orderCreated = DispatchPreparing.builder().orderId(randomUUID()).build();
         sendMessage(DISPATCH_TRACKING_TOPIC, orderCreated);
 
@@ -99,7 +112,17 @@ public class DispatchTrackingIntegrationTest {
                 .until(testListener.dispatchPreparingCounter::get, equalTo(1));
         await().atMost(1, TimeUnit.SECONDS).pollDelay(100, TimeUnit.MILLISECONDS)
                 .until(testListener.trackingStatusCounter::get, equalTo(1));
+    }@Test
+    public void testDispatchCompletedTrackingFlow() throws Exception {
+        DispatchCompleted orderCreated = DispatchCompleted.builder().orderId(randomUUID()).date(Instant.now().toString()).build();
+        sendMessage(DISPATCH_TRACKING_TOPIC, orderCreated);
+
+        await().atMost(3, TimeUnit.SECONDS).pollDelay(100, TimeUnit.MILLISECONDS)
+                .until(testListener.dispatchCompletedCounter::get, equalTo(1));
+        await().atMost(1, TimeUnit.SECONDS).pollDelay(100, TimeUnit.MILLISECONDS)
+                .until(testListener.trackingStatusCounter::get, equalTo(1));
     }
+
 
     private void sendMessage(String topic, Object data) throws Exception {
         kafkaTemplate.send(MessageBuilder

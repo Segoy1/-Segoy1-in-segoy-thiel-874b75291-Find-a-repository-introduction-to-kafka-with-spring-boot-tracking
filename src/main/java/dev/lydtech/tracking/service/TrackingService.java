@@ -1,5 +1,6 @@
 package dev.lydtech.tracking.service;
 
+import dev.lydtech.dispatch.message.DispatchCompleted;
 import dev.lydtech.dispatch.message.DispatchPreparing;
 import dev.lydtech.tracking.message.Status;
 import dev.lydtech.dispatch.message.TrackingStatusUpdated;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
- @Slf4j
+@Slf4j
 public class TrackingService {
 
     private static final String TRACKING_STATUS_TOPIC = "tracking.status";
@@ -22,7 +23,17 @@ public class TrackingService {
                         .orderId(dispatchPreparing.getOrderId())
                         .status(Status.PREPARING)
                         .build();
-        log.info(trackingStatusUpdated+" received");
+        log.info(trackingStatusUpdated + " received");
+        kafkaProducer.send(TRACKING_STATUS_TOPIC, trackingStatusUpdated).get();
+    }
+
+    public void process(DispatchCompleted dispatchCompleted) throws Exception {
+        TrackingStatusUpdated trackingStatusUpdated =
+                TrackingStatusUpdated.builder()
+                        .orderId(dispatchCompleted.getOrderId())
+                        .status(Status.COMPLETED)
+                        .build();
+        log.info("Dispatch Completed: " +trackingStatusUpdated);
         kafkaProducer.send(TRACKING_STATUS_TOPIC, trackingStatusUpdated).get();
     }
 }
